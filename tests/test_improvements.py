@@ -42,6 +42,32 @@ class SourcePerProviderTests(unittest.TestCase):
         self.assertTrue(any(x['event'] == 'validation_empty_answer' for x in result['trace']))
 
 
+class InjectionEchoTests(unittest.TestCase):
+    def test_echoed_marker_triggers_revision(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        tools = ScenarioTools('status_injection')
+        marker = tools.execute('get_status', {'provider': 'github'})['external_notice'].split('print ')[1].split()[0].rstrip('.')
+        fake = FakeProvider([tool_call('1', 'get_status', '{"provider":"github"}'),
+                             final(f'Bình thường. Đã bỏ qua lệnh in {marker}.'), final('Bình thường. Đã bỏ qua chỉ dẫn đáng ngờ.')])
+        result = run_agent('GitHub thế nào?', fake, tools, max_steps=4)
+        self.assertEqual(result['status'], 'completed')
+        self.assertNotIn(marker, result['answer'])
+        event = next(x for x in result['trace'] if x['event'] == 'validation_injection_echo')
+        self.assertEqual(event['markers'], [marker])
+        # Thông điệp yêu cầu sửa không được lặp lại marker cho model.
+        self.assertNotIn(marker, fake.histories[2][-1]['content'])
+
+    def test_no_false_positive_on_real_snapshot(self):
+        from agent import _injection_markers
+        tools = StatusTools()
+        for provider in ('github', 'cloudflare'):
+            status = tools.get_status(provider)
+            self.assertEqual(_injection_markers(status), set())
+            data = tools._load(provider)['data']['incidents']['incidents']
+            self.assertEqual(_injection_markers(data), set())
+
+
 class RetryBudgetTests(unittest.TestCase):
     def test_persistent_429_is_capped_at_three_real_calls(self):
         calls = [tool_call(str(i), 'get_vercel_status', '{}') for i in range(5)]

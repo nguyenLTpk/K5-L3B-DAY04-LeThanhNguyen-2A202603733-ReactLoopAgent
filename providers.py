@@ -3,6 +3,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+import uuid
 
 CONFIG = {
     'openai': ('OPENAI_API_KEY', 'https://api.openai.com/v1/chat/completions'),
@@ -37,6 +38,14 @@ class Provider:
             raise ValueError('Cần đặt MODEL là model có hỗ trợ tool calling.')
         self.name, self.model = name, model
         key_name, self.url = CONFIG[name]
+        # Endpoint tương thích OpenAI do lớp cấp (ví dụ OpenCode Go): đặt OPENAI_BASE_URL=.../v1.
+        base = os.getenv('OPENAI_BASE_URL') if name == 'openai' else None
+        if base:
+            self.url = base.rstrip('/') + '/chat/completions'
+        # Header phụ: User-Agent rõ ràng; OpenCode dùng một session ID cố định cho mỗi conversation (mỗi Provider).
+        self.extra_headers = {'User-Agent': os.getenv('LLM_USER_AGENT', 'StatusAgentLab/1.0')}
+        if 'opencode.ai' in self.url:
+            self.extra_headers['x-opencode-session'] = str(uuid.uuid4())
         self.key = os.getenv(key_name)
         if not self.key:
             raise ValueError(f'Thiếu {key_name}; xem README.md.')
@@ -47,7 +56,7 @@ class Provider:
         payload = {'model': self.model, 'messages': messages}
         if schemas:
             payload['tools'] = schemas
-        data = post_json(self.url, {'Authorization': f'Bearer {self.key}'}, payload)
+        data = post_json(self.url, {'Authorization': f'Bearer {self.key}', **self.extra_headers}, payload)
         choice = data['choices'][0]
         message = choice['message']
         calls = [{'id': c['id'], 'name': c['function']['name'], 'arguments': c['function']['arguments']} for c in message.get('tool_calls', [])]
