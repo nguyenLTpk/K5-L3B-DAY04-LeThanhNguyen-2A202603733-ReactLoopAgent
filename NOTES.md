@@ -5,6 +5,7 @@ MSSV: 2A202603733
 
 **Cấu hình cả hai lần chạy** (khối `config` giống hệt nhau trong `eval_before.json` và `eval_after.json`): agent và judge đều là `deepseek-v4.1-flash` qua endpoint tương thích OpenAI do lớp cấp (OpenCode Go, `PROVIDER=openai` + `OPENAI_BASE_URL`), `max_steps = 8`, snapshot mặc định, dataset `core` 22 case, `--workers 4`.
 
+- Ghi chú provider: các eval chạy trước khi repo đề thêm provider chính thức `opencode-go` (commit đề `147982b`), nên `config.provider` ghi `openai`. Đã merge commit đó; hai cách gọi cùng endpoint, model và session header, có thể chạy lại bằng `PROVIDER=opencode-go` + `OPENCODE_GO_API_KEY`.
 - `eval_before.json`: agent baseline (commit `d48b488`, chỉ có Bài 1–2).
 - `eval_after.json`: agent sau cải tiến Bài 4 (commit `f27ed07`).
 
